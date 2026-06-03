@@ -1,19 +1,22 @@
 package org.example;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.scene.control.CheckBox;
+import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import reactor.core.Disposables;
 
 public class MyCheckBox extends CheckBox {
     private final CheckBoxModel model;
     private final String checkBoxName;
-    private volatile boolean processing = false;
-    private reactor.core.Disposable currentDisposable;
+    private final SimpleBooleanProperty processing = new SimpleBooleanProperty(false);
+    private Disposable.Swap currentDisposable;
 
     public MyCheckBox(String text) {
         super(text);
         checkBoxName = text;
         this.model = new CheckBoxModel();
-        // Связываем UI состояние с моделью
+        this.disableProperty().bind(processing);
         this.selectedProperty().bindBidirectional(model.selectedProperty());
         setupAsyncHandler();
     }
@@ -21,45 +24,33 @@ public class MyCheckBox extends CheckBox {
     private void setupAsyncHandler() {
         // Используем слушатель изменений свойства selected
         selectedProperty().addListener((obs, oldVal, newVal) -> {
-            if (processing)
+            if (processing.get())
                 return;
-            // Отменяем предыдущую подписку, если она активна
-            if (currentDisposable != null && !currentDisposable.isDisposed()) {
-                currentDisposable.dispose();
+            if (currentDisposable == null) {
+                currentDisposable = Disposables.swap();
             }
-            processing = true;
-            this.setDisable(true);
-            currentDisposable = Mono.fromCallable(() -> {
-                        // Имитация долгой операции
-                        Thread.sleep(3000);
-                        Functions.MaybeGetException();
-                        return newVal;
-                    })
-                    .subscribeOn(Schedulers.boundedElastic())
-                    .subscribe(
-                            result -> {
-                                // SUCCEEDED
-                                System.out.println(String.format(checkBoxName + ", операция выполнена"));
-                                model.confirmChange();
-                                finishProcessing();
-                            },
-                            error -> {
-                                // FAILED
-                                System.out.println(String.format(checkBoxName + ", " + error.getMessage() + ", операция вызвала ошибку"));
-                                model.revertChange();
-                                finishProcessing();
-                            }
-                    );
-        });
-    }
-
-    private void finishProcessing() {
-        javafx.application.Platform.runLater(() -> {
-            setDisable(false);
-            processing = false;
-            if (currentDisposable != null) {
-                currentDisposable = null;
-            }
+            processing.set(!processing.get()); // инвертирование флага
+            currentDisposable.update(Mono.fromCallable(() -> {
+                // Имитация долгой операции
+                Thread.sleep(1000);
+                Functions.MaybeGetException();
+                return newVal;
+            }).subscribeOn(Schedulers.boundedElastic()).subscribe(
+                    result -> { // SUCCEEDED
+                        javafx.application.Platform.runLater(() -> {
+                            System.out.println(String.format(checkBoxName + ", операция выполнена"));
+                            model.confirmChange();
+                            processing.set(!processing.get()); // инвертирование флага
+                        });
+                    },
+                    error -> { // FAILED
+                        javafx.application.Platform.runLater(() -> {
+                            System.out.println(String.format(checkBoxName + ", " + error.getMessage() + ", операция вызвала ошибку"));
+                            model.revertChange();
+                            processing.set(!processing.get()); // инвертирование флага
+                        });
+                    }
+            ));
         });
     }
 }
