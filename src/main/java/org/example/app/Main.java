@@ -1,4 +1,4 @@
-package org.example;
+package org.example.app;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
@@ -6,6 +6,7 @@ import javafx.scene.control.Separator;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import org.example.controls.MyCheckBox;
 
 public class Main extends Application {
     @Override
