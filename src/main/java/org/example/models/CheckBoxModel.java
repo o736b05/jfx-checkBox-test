@@ -9,14 +9,12 @@ import reactor.core.scheduler.Schedulers;
 public class CheckBoxModel implements AsyncService {
     private final BooleanProperty selected = new SimpleBooleanProperty(false);
     private boolean previousState = false;
-    private boolean confirmedState = false;
 
     public BooleanProperty selectedProperty() {
         return selected;
     }
 
     public void confirmChange() {
-        confirmedState = selected.get();
         previousState = selected.get();
     }
 
